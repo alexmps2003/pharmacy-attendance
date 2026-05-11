@@ -18,7 +18,7 @@ export default function Sidebar() {
           href="/employees"
           className="px-3 py-2 rounded-md hover:bg-zinc-800 transition-colors text-sm font-medium"
         >
-          Employees
+          Attendance
         </Link>
         <Link
           href="/employees/new"
