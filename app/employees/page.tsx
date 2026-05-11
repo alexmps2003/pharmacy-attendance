@@ -1,30 +1,35 @@
 import Link from "next/link";
+import { supabase } from "../../lib/supabase";
 
-const employees = [
-  {
-    id: 1,
-    name: "Nimal Perera",
-    role: "Cashier",
-  },
-  {
-    id: 2,
-    name: "Kamal Silva",
-    role: "Pharmacist",
-  },
-  {
-    id: 3,
-    name: "Saman Kumara",
-    role: "Stock Manager",
-  },
-];
+export default async function EmployeesPage() {
+  const { data: employees, error } = await supabase
+    .from("employees")
+    .select("id, name, role")
+    .eq("is_active", true)
+    .order("id", { ascending: true });
 
-export default function EmployeesPage() {
+  if (error) {
+    return (
+      <main className="min-h-screen bg-zinc-950 p-8 text-white">
+        <h1 className="text-4xl font-bold">Employees</h1>
+        <p className="mt-4 text-red-400">Failed to load employees.</p>
+        <p className="mt-2 text-sm text-zinc-500">{error.message}</p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 p-8 text-white">
       <h1 className="text-4xl font-bold">Employees</h1>
 
       <div className="mt-8 grid gap-4">
-        {employees.map((employee) => (
+        {employees?.length === 0 && (
+          <p className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-zinc-400">
+            No active employees found. Check your Supabase employees table.
+          </p>
+        )}
+
+        {employees?.map((employee) => (
           <Link
             key={employee.id}
             href={`/employees/${employee.id}`}

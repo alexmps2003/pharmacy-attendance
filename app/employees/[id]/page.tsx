@@ -2,25 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../../../lib/supabase";
 
-const employees = [
-  {
-    id: 1,
-    name: "Nimal Perera",
-    role: "Cashier",
-  },
-  {
-    id: 2,
-    name: "Kamal Silva",
-    role: "Pharmacist",
-  },
-  {
-    id: 3,
-    name: "Saman Kumara",
-    role: "Stock Manager",
-  },
-];
+type Employee = {
+  id: number;
+  name: string;
+  role: string;
+};
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString([], {
@@ -51,12 +40,75 @@ function formatMinutes(minutes: number) {
 
 export default function EmployeePage() {
   const params = useParams<{ id: string }>();
-  const employee = employees.find((item) => item.id === Number(params.id));
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [isLoadingEmployee, setIsLoadingEmployee] = useState(true);
 
   const [checkIn, setCheckIn] = useState<string | null>(null);
   const [lunchStart, setLunchStart] = useState<string | null>(null);
   const [lunchEnd, setLunchEnd] = useState<string | null>(null);
   const [checkOut, setCheckOut] = useState<string | null>(null);
+  const [recordId, setRecordId] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadEmployee() {
+      setIsLoadingEmployee(true);
+
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, name, role")
+        .eq("id", Number(params.id))
+        .eq("is_active", true)
+        .single();
+
+      if (error) {
+        console.error("Error loading employee:", error);
+        setEmployee(null);
+      } else {
+        setEmployee(data);
+      }
+
+      setIsLoadingEmployee(false);
+    }
+
+    loadEmployee();
+  }, [params.id]);
+
+  useEffect(() => {
+    // Load today's attendance record (if any) for this employee
+    async function loadToday() {
+      try {
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const employeeId = Number(params.id);
+
+        const { data, error } = await supabase
+          .from("attendance_records")
+          .select("id, check_in, lunch_start, lunch_end, check_out")
+          .eq("employee_id", employeeId)
+          .eq("work_date", today)
+          .limit(1);
+
+        if (error) {
+          console.error("Error loading attendance:", error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const rec: any = data[0];
+          setRecordId(rec.id ?? null);
+
+          if (rec.check_in) setCheckIn(formatTime(new Date(rec.check_in)));
+          if (rec.lunch_start)
+            setLunchStart(formatTime(new Date(rec.lunch_start)));
+          if (rec.lunch_end) setLunchEnd(formatTime(new Date(rec.lunch_end)));
+          if (rec.check_out) setCheckOut(formatTime(new Date(rec.check_out)));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    loadToday();
+  }, [params.id]);
 
   const lunchMinutes = getMinutesBetween(lunchStart, lunchEnd);
   const extraLunchMinutes = Math.max(0, lunchMinutes - 30);
@@ -67,6 +119,137 @@ export default function EmployeePage() {
 
   function saveCurrentTime(setter: (time: string) => void) {
     setter(formatTime(new Date()));
+  }
+
+  async function ensureRecordExists() {
+    const today = new Date().toISOString().slice(0, 10);
+    const employeeId = Number(params.id);
+
+    if (recordId) return recordId;
+
+    // Try to select again (race safety)
+    const { data } = await supabase
+      .from("attendance_records")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .eq("work_date", today)
+      .limit(1);
+
+    if (data && data.length > 0) {
+      setRecordId(data[0].id);
+      return data[0].id;
+    }
+
+    // Insert a new record
+    const { data: inserted, error: insertErr } = await supabase
+      .from("attendance_records")
+      .insert({ employee_id: employeeId, work_date: today })
+      .select("id")
+      .limit(1);
+
+    if (insertErr) {
+      console.error("Error creating attendance record:", insertErr);
+      return null;
+    }
+
+    if (inserted && inserted.length > 0) {
+      setRecordId(inserted[0].id);
+      return inserted[0].id;
+    }
+
+    return null;
+  }
+
+  async function handleCheckIn() {
+    const now = new Date();
+    const iso = now.toISOString();
+    saveCurrentTime(setCheckIn);
+
+    try {
+      const rid = await ensureRecordExists();
+      if (rid) {
+        await supabase
+          .from("attendance_records")
+          .update({ check_in: iso })
+          .eq("id", rid);
+      }
+    } catch (err) {
+      console.error("Check in error:", err);
+    }
+  }
+
+  async function handleLunchStart() {
+    const now = new Date();
+    const iso = now.toISOString();
+    saveCurrentTime(setLunchStart);
+
+    try {
+      const rid = await ensureRecordExists();
+      if (rid) {
+        await supabase
+          .from("attendance_records")
+          .update({ lunch_start: iso })
+          .eq("id", rid);
+      }
+    } catch (err) {
+      console.error("Lunch start error:", err);
+    }
+  }
+
+  async function handleLunchEnd() {
+    const now = new Date();
+    const iso = now.toISOString();
+    saveCurrentTime(setLunchEnd);
+
+    try {
+      const rid = await ensureRecordExists();
+      if (rid) {
+        await supabase
+          .from("attendance_records")
+          .update({ lunch_end: iso })
+          .eq("id", rid);
+      }
+    } catch (err) {
+      console.error("Lunch end error:", err);
+    }
+  }
+
+  async function handleCheckOut() {
+    const now = new Date();
+    const iso = now.toISOString();
+    saveCurrentTime(setCheckOut);
+
+    try {
+      // compute minutes based on current local display values
+      const lunchMins = getMinutesBetween(lunchStart, formatTime(now));
+      const extra = Math.max(0, lunchMins - 30);
+      const total = Math.max(
+        0,
+        getMinutesBetween(checkIn, formatTime(now)) - extra,
+      );
+
+      const rid = await ensureRecordExists();
+      if (rid) {
+        await supabase
+          .from("attendance_records")
+          .update({
+            check_out: iso,
+            extra_lunch_minutes: extra,
+            total_work_minutes: total,
+          })
+          .eq("id", rid);
+      }
+    } catch (err) {
+      console.error("Check out error:", err);
+    }
+  }
+
+  if (isLoadingEmployee) {
+    return (
+      <main className="min-h-screen bg-zinc-950 p-8 text-white">
+        <h1 className="text-3xl font-bold">Loading employee...</h1>
+      </main>
+    );
   }
 
   if (!employee) {
@@ -94,7 +277,7 @@ export default function EmployeePage() {
       </Link>
 
       {/* Profile Header */}
-      <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-5xl font-bold text-white">{employee.name}</h1>
@@ -120,8 +303,8 @@ export default function EmployeePage() {
         {/* Action Buttons */}
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <button
-            onClick={() => saveCurrentTime(setCheckIn)}
-            className="group relative rounded-xl bg-linear-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-green-500/30 hover:border-green-400/50"
+            onClick={handleCheckIn}
+            className="group relative rounded-xl bg-gradient-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-green-500/30 hover:border-green-400/50"
           >
             <span className="relative z-10">✓ Check In</span>
             {checkIn && (
@@ -132,8 +315,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={() => saveCurrentTime(setLunchStart)}
-            className="group relative rounded-xl bg-linear-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-amber-500/30 hover:border-amber-400/50"
+            onClick={handleLunchStart}
+            className="group relative rounded-xl bg-gradient-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-amber-500/30 hover:border-amber-400/50"
           >
             <span className="relative z-10">⏸ Start Lunch</span>
             {lunchStart && (
@@ -144,8 +327,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={() => saveCurrentTime(setLunchEnd)}
-            className="group relative rounded-xl bg-linear-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-blue-500/30 hover:border-blue-400/50"
+            onClick={handleLunchEnd}
+            className="group relative rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-blue-500/30 hover:border-blue-400/50"
           >
             <span className="relative z-10">▶ End Lunch</span>
             {lunchEnd && (
@@ -156,8 +339,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={() => saveCurrentTime(setCheckOut)}
-            className="group relative rounded-xl bg-linear-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-red-500/30 hover:border-red-400/50"
+            onClick={handleCheckOut}
+            className="group relative rounded-xl bg-gradient-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-red-500/30 hover:border-red-400/50"
           >
             <span className="relative z-10">✕ Check Out</span>
             {checkOut && (
@@ -170,7 +353,7 @@ export default function EmployeePage() {
       </section>
 
       {/* Attendance Summary */}
-      <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
         <h2 className="text-2xl font-bold text-white uppercase tracking-wide">
           Today&apos;s Attendance
         </h2>
@@ -212,7 +395,7 @@ export default function EmployeePage() {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-8 rounded-xl border border-zinc-700 bg-linear-to-br from-zinc-800/50 to-zinc-900/50 p-6 backdrop-blur-sm">
+        <div className="mt-8 rounded-xl border border-zinc-700 bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 p-6 backdrop-blur-sm">
           <div className="grid gap-6 md:grid-cols-3">
             <div className="border-r border-zinc-700 pr-6 md:border-r">
               <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
