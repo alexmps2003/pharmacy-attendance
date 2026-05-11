@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export default async function EmployeesPage() {
   const { data: employees, error } = await supabase
@@ -10,7 +10,7 @@ export default async function EmployeesPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-zinc-950 p-8 text-white">
+      <main className="p-8">
         <h1 className="text-4xl font-bold">Employees</h1>
         <p className="mt-4 text-red-400">Failed to load employees.</p>
         <p className="mt-2 text-sm text-zinc-500">{error.message}</p>
@@ -19,7 +19,7 @@ export default async function EmployeesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-8 text-white">
+    <main className="p-8">
       <h1 className="text-4xl font-bold">Employees</h1>
 
       <div className="mt-8 grid gap-4">

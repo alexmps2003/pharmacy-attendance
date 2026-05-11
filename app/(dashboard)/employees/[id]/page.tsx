@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 type Employee = {
   id: number;
@@ -246,7 +246,7 @@ export default function EmployeePage() {
 
   if (isLoadingEmployee) {
     return (
-      <main className="min-h-screen bg-zinc-950 p-8 text-white">
+      <main className=" p-8 text-white">
         <h1 className="text-3xl font-bold">Loading employee...</h1>
       </main>
     );
@@ -254,7 +254,7 @@ export default function EmployeePage() {
 
   if (!employee) {
     return (
-      <main className="min-h-screen bg-zinc-950 p-8 text-white">
+      <main className=" p-8 text-white">
         <h1 className="text-3xl font-bold">Employee not found</h1>
 
         <Link
@@ -268,7 +268,7 @@ export default function EmployeePage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-6 md:p-8 text-white">
+    <main className=" p-6 md:p-8 text-white">
       <Link
         href="/employees"
         className="inline-flex items-center text-sm text-zinc-400 hover:text-white transition-colors duration-200"
