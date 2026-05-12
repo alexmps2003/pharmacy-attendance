@@ -110,7 +110,8 @@ export default function EmployeePage() {
     loadToday();
   }, [params.id]);
 
-  const lunchMinutes = getMinutesBetween(lunchStart, lunchEnd);
+  const lunchMinutes =
+    !lunchStart || !lunchEnd ? 0 : getMinutesBetween(lunchStart, lunchEnd);
   const extraLunchMinutes = Math.max(0, lunchMinutes - 30);
   const totalMinutes = Math.max(
     0,
@@ -197,6 +198,11 @@ export default function EmployeePage() {
   }
 
   async function handleLunchEnd() {
+    if (!lunchStart) {
+      alert("Please start lunch first.");
+      return;
+    }
+
     const now = new Date();
     const iso = now.toISOString();
     saveCurrentTime(setLunchEnd);
@@ -215,13 +221,19 @@ export default function EmployeePage() {
   }
 
   async function handleCheckOut() {
+    if (!checkIn) {
+      alert("Please check in first.");
+      return;
+    }
+
     const now = new Date();
     const iso = now.toISOString();
     saveCurrentTime(setCheckOut);
 
     try {
       // compute minutes based on current local display values
-      const lunchMins = getMinutesBetween(lunchStart, formatTime(now));
+      const lunchMins =
+        !lunchStart || !lunchEnd ? 0 : getMinutesBetween(lunchStart, lunchEnd);
       const extra = Math.max(0, lunchMins - 30);
       const total = Math.max(
         0,
