@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { EmployeeTable } from "@/components/EmployeeTable";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const { data: employees, error } = await supabase
     .from("employees")

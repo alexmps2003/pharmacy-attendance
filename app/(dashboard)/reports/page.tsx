@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 function formatTime(isoString: string | null) {
   if (!isoString) return "-";
   try {
