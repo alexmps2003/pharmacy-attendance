@@ -222,8 +222,8 @@ export default function ReportsPage() {
                 Loading records...
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-                <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900">
+                <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400">
                     <tr>
                       <th className="px-6 py-4 font-medium">Employee</th>
@@ -317,8 +317,8 @@ export default function ReportsPage() {
                 Loading summary...
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-                <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900">
+                <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400">
                     <tr>
                       <th className="px-6 py-4 font-medium">Name</th>
