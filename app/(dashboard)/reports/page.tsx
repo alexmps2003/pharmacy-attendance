@@ -24,6 +24,13 @@ function formatMinutes(minutes: number | null) {
   return `${m}m`;
 }
 
+function formatWorkMinutes(minutes: number | null) {
+  if (minutes == null) return "0h 0m";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${m}m`;
+}
+
 interface AttendanceRecord {
   id: number;
   check_in: string | null;
@@ -38,6 +45,16 @@ interface AttendanceRecord {
   } | null;
 }
 
+interface EmployeeSummary {
+  id: string;
+  name: string;
+  role: string | null;
+  is_active: boolean;
+  attendanceDays: number;
+  totalWorkMinutes: number;
+  extraLunchMinutes: number;
+}
+
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<"daily" | "monthly" | "summary">(
     "daily",
@@ -45,6 +62,10 @@ export default function ReportsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [summaryRecords, setSummaryRecords] = useState<EmployeeSummary[]>([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
 
   useEffect(() => {
     async function loadTodayRecords() {
@@ -82,8 +103,65 @@ export default function ReportsPage() {
       }
     }
 
+    async function loadSummaryRecords() {
+      try {
+        setSummaryLoading(true);
+        setSummaryError("");
+
+        const { data, error } = await supabase
+          .from("employees")
+          .select(
+            `
+            id,
+            name,
+            role,
+            is_active,
+            attendance_records (
+              total_work_minutes,
+              extra_lunch_minutes
+            )
+          `,
+          )
+          .order("name");
+
+        if (error) throw error;
+
+        const summaryData: EmployeeSummary[] = (data || []).map((emp: any) => {
+          const records = emp.attendance_records || [];
+          const attendanceDays = records.length;
+
+          let totalWorkMinutes = 0;
+          let extraLunchMinutes = 0;
+
+          records.forEach((record: any) => {
+            totalWorkMinutes += record.total_work_minutes || 0;
+            extraLunchMinutes += record.extra_lunch_minutes || 0;
+          });
+
+          return {
+            id: emp.id,
+            name: emp.name,
+            role: emp.role,
+            is_active: emp.is_active,
+            attendanceDays,
+            totalWorkMinutes,
+            extraLunchMinutes,
+          };
+        });
+
+        setSummaryRecords(summaryData);
+      } catch (err: any) {
+        console.error(err);
+        setSummaryError("Failed to load employee summary.");
+      } finally {
+        setSummaryLoading(false);
+      }
+    }
+
     if (activeTab === "daily") {
       loadTodayRecords();
+    } else if (activeTab === "summary") {
+      loadSummaryRecords();
     }
   }, [activeTab]);
 
@@ -223,11 +301,82 @@ export default function ReportsPage() {
         )}
 
         {activeTab === "summary" && (
-          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/50 p-12 text-center">
-            <h3 className="text-lg font-medium text-white mb-2">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-white">
               Employee Summary
-            </h3>
-            <p className="text-zinc-500">Coming soon</p>
+            </h2>
+
+            {summaryError && (
+              <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+                {summaryError}
+              </div>
+            )}
+
+            {summaryLoading ? (
+              <div className="text-zinc-400 animate-pulse">
+                Loading summary...
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Name</th>
+                      <th className="px-6 py-4 font-medium">Role</th>
+                      <th className="px-6 py-4 font-medium">Status</th>
+                      <th className="px-6 py-4 font-medium">Attendance Days</th>
+                      <th className="px-6 py-4 font-medium">Total Work Time</th>
+                      <th className="px-6 py-4 font-medium">
+                        Extra Lunch (Deduct)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {summaryRecords.length > 0 ? (
+                      summaryRecords.map((emp) => (
+                        <tr key={emp.id} className="text-zinc-100">
+                          <td className="px-6 py-4 font-medium">{emp.name}</td>
+                          <td className="px-6 py-4 text-zinc-400">
+                            {emp.role || "-"}
+                          </td>
+                          <td className="px-6 py-4">
+                            {emp.is_active ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-400/10 px-2 py-1 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-400/20">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-zinc-400/10 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-zinc-400/20">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-emerald-400">
+                            {emp.attendanceDays}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-emerald-400">
+                            {formatWorkMinutes(emp.totalWorkMinutes)}
+                          </td>
+                          <td className="px-6 py-4 text-red-400">
+                            {formatMinutes(emp.extraLunchMinutes)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-12 text-center text-zinc-500"
+                        >
+                          <p className="text-lg mb-1">
+                            No employee summary available.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
