@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   return (
     <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950 p-6 flex flex-col md:min-h-screen shrink-0 text-white">
@@ -40,7 +48,7 @@ export default function Sidebar() {
       </div>
 
       <nav
-        className={`${isOpen ? "flex mt-8" : "hidden"} md:flex md:mt-0 flex-col gap-2`}
+        className={`${isOpen ? "flex mt-8" : "hidden"} md:flex md:mt-0 flex-col flex-1 gap-2`}
       >
         <Link
           href="/"
@@ -66,6 +74,13 @@ export default function Sidebar() {
         >
           Reports
         </Link>
+
+        <button
+          onClick={handleLogout}
+          className="md:mt-auto mt-4 px-3 py-2 rounded-md hover:bg-red-500/10 transition-colors text-sm font-medium text-red-400 hover:text-red-300 text-left"
+        >
+          Logout
+        </button>
       </nav>
     </aside>
   );
