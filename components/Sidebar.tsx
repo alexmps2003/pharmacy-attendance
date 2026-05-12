@@ -15,7 +15,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950 p-6 flex flex-col md:min-h-screen shrink-0 text-white">
+    <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950 p-6 flex flex-col md:h-screen shrink-0 text-white">
       <div className="flex justify-between items-center mb-0 md:mb-8">
         <div className="font-bold text-xl tracking-tight">Iresha Pharmacy</div>
         <button
@@ -48,7 +48,7 @@ export default function Sidebar() {
       </div>
 
       <nav
-        className={`${isOpen ? "flex mt-8" : "hidden"} md:flex md:mt-0 flex-col flex-1 gap-2`}
+        className={`${isOpen ? "flex mt-8" : "hidden"} md:flex md:mt-0 flex-col flex-1 gap-2 overflow-y-auto`}
       >
         <Link
           href="/"
