@@ -218,6 +218,34 @@ export default function EditEmployeePage({
           >
             {loading ? "Saving..." : "Update Employee"}
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (
+                confirm(
+                  "Are you sure you want to archive this employee? They will no longer appear in the system, but their past records will be kept.",
+                )
+              ) {
+                setLoading(true);
+                try {
+                  const { error } = await supabase
+                    .from("employees")
+                    .update({ is_archived: true })
+                    .eq("id", employeeId);
+                  if (error) throw error;
+                  router.push("/");
+                  router.refresh();
+                } catch (err: any) {
+                  setError(err.message || "Failed to archive employee.");
+                  setLoading(false);
+                }
+              }
+            }}
+            disabled={loading}
+            className="rounded-lg bg-red-500/10 px-6 py-3 font-medium text-red-500 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+          >
+            Archive Employee
+          </button>
           <Link
             href="/"
             className="text-zinc-400 hover:text-white transition-colors"

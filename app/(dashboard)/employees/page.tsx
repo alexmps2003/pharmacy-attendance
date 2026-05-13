@@ -8,6 +8,7 @@ export default async function EmployeesPage() {
     .from("employees")
     .select("id, name, role")
     .eq("is_active", true)
+    .eq("is_archived", false)
     .order("id", { ascending: true });
 
   if (error) {

@@ -7,6 +7,7 @@ export default async function Home() {
   const { data: employees, error } = await supabase
     .from("employees")
     .select("id, name, role, is_active")
+    .eq("is_archived", false)
     .order("id", { ascending: true });
 
   return (
