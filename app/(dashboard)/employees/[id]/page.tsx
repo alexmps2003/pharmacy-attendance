@@ -9,6 +9,7 @@ type Employee = {
   id: number;
   name: string;
   role: string;
+  pin_code: string;
 };
 
 function formatTime(date: Date) {
@@ -49,13 +50,19 @@ export default function EmployeePage() {
   const [checkOut, setCheckOut] = useState<string | null>(null);
   const [recordId, setRecordId] = useState<number | null>(null);
 
+  const [pendingAction, setPendingAction] = useState<
+    "checkin" | "startLunch" | "endLunch" | "checkout" | null
+  >(null);
+  const [modalPinInput, setModalPinInput] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadEmployee() {
       setIsLoadingEmployee(true);
 
       const { data, error } = await supabase
         .from("employees")
-        .select("id, name, role")
+        .select("id, name, role, pin_code")
         .eq("id", Number(params.id))
         .eq("is_active", true)
         .single();
@@ -161,87 +168,92 @@ export default function EmployeePage() {
     return null;
   }
 
-  async function handleCheckIn() {
-    const now = new Date();
-    const iso = now.toISOString();
-    saveCurrentTime(setCheckIn);
+  function openActionModal(
+    action: "checkin" | "startLunch" | "endLunch" | "checkout",
+  ) {
+    // reset modal state
+    setModalPinInput("");
+    setModalError(null);
 
+    // pre-validate action-specific rules and show message inside modal if needed
+    if (action === "endLunch" && !lunchStart) {
+      setModalError("Please start lunch first.");
+    }
+
+    if (action === "checkout" && !checkIn) {
+      setModalError("Please check in first.");
+    }
+
+    setPendingAction(action);
+  }
+
+  async function performPendingAction() {
+    if (!pendingAction) return;
+
+    // re-check preconditions
+    if (pendingAction === "endLunch" && !lunchStart) {
+      setModalError("Please start lunch first.");
+      return;
+    }
+    if (pendingAction === "checkout" && !checkIn) {
+      setModalError("Please check in first.");
+      return;
+    }
+
+    // PIN validation
+    if (!modalPinInput) {
+      setModalError("Please enter employee PIN.");
+      return;
+    }
+    if (employee?.pin_code && modalPinInput !== employee.pin_code) {
+      setModalError("Incorrect PIN.");
+      return;
+    }
+
+    // all good - perform the selected action
     try {
+      const now = new Date();
+      const iso = now.toISOString();
+
       const rid = await ensureRecordExists();
-      if (rid) {
+      if (!rid) return;
+
+      if (pendingAction === "checkin") {
         await supabase
           .from("attendance_records")
           .update({ check_in: iso })
           .eq("id", rid);
+        saveCurrentTime(setCheckIn);
       }
-    } catch (err) {
-      console.error("Check in error:", err);
-    }
-  }
 
-  async function handleLunchStart() {
-    const now = new Date();
-    const iso = now.toISOString();
-    saveCurrentTime(setLunchStart);
-
-    try {
-      const rid = await ensureRecordExists();
-      if (rid) {
+      if (pendingAction === "startLunch") {
         await supabase
           .from("attendance_records")
           .update({ lunch_start: iso })
           .eq("id", rid);
+        saveCurrentTime(setLunchStart);
       }
-    } catch (err) {
-      console.error("Lunch start error:", err);
-    }
-  }
 
-  async function handleLunchEnd() {
-    if (!lunchStart) {
-      alert("Please start lunch first.");
-      return;
-    }
-
-    const now = new Date();
-    const iso = now.toISOString();
-    saveCurrentTime(setLunchEnd);
-
-    try {
-      const rid = await ensureRecordExists();
-      if (rid) {
+      if (pendingAction === "endLunch") {
         await supabase
           .from("attendance_records")
           .update({ lunch_end: iso })
           .eq("id", rid);
+        saveCurrentTime(setLunchEnd);
       }
-    } catch (err) {
-      console.error("Lunch end error:", err);
-    }
-  }
 
-  async function handleCheckOut() {
-    if (!checkIn) {
-      alert("Please check in first.");
-      return;
-    }
+      if (pendingAction === "checkout") {
+        // compute minutes based on current local display values
+        const lunchMins =
+          !lunchStart || !lunchEnd
+            ? 0
+            : getMinutesBetween(lunchStart, lunchEnd);
+        const extra = Math.max(0, lunchMins - 30);
+        const total = Math.max(
+          0,
+          getMinutesBetween(checkIn, formatTime(now)) - extra,
+        );
 
-    const now = new Date();
-    const iso = now.toISOString();
-    saveCurrentTime(setCheckOut);
-
-    try {
-      // compute minutes based on current local display values
-      const lunchMins =
-        !lunchStart || !lunchEnd ? 0 : getMinutesBetween(lunchStart, lunchEnd);
-      const extra = Math.max(0, lunchMins - 30);
-      const total = Math.max(
-        0,
-        getMinutesBetween(checkIn, formatTime(now)) - extra,
-      );
-
-      const rid = await ensureRecordExists();
-      if (rid) {
         await supabase
           .from("attendance_records")
           .update({
@@ -250,9 +262,17 @@ export default function EmployeePage() {
             total_work_minutes: total,
           })
           .eq("id", rid);
+
+        saveCurrentTime(setCheckOut);
       }
+
+      // close modal and clear pin
+      setPendingAction(null);
+      setModalPinInput("");
+      setModalError(null);
     } catch (err) {
-      console.error("Check out error:", err);
+      console.error("Attendance action error:", err);
+      setModalError("An unexpected error occurred.");
     }
   }
 
@@ -289,7 +309,7 @@ export default function EmployeePage() {
       </Link>
 
       {/* Profile Header */}
-      <section className="mt-8 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-5xl font-bold text-white">{employee.name}</h1>
@@ -300,23 +320,13 @@ export default function EmployeePage() {
           </div>
         </div>
 
-        {/* PIN Input Section */}
-        <div className="mt-8 rounded-xl border border-zinc-700 bg-zinc-900/50 p-5 backdrop-blur-sm">
-          <label className="block text-sm font-semibold text-zinc-200 uppercase tracking-wide">
-            Employee PIN
-          </label>
-          <input
-            type="password"
-            placeholder="Enter PIN (optional)"
-            className="mt-3 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/50"
-          />
-        </div>
+        {/* PIN is requested in a modal per-action; no permanent input here */}
 
         {/* Action Buttons */}
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <button
-            onClick={handleCheckIn}
-            className="group relative rounded-xl bg-gradient-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-green-500/30 hover:border-green-400/50"
+            onClick={() => openActionModal("checkin")}
+            className="group relative rounded-xl bg-linear-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-green-500/30 hover:border-green-400/50"
           >
             <span className="relative z-10">✓ Check In</span>
             {checkIn && (
@@ -327,8 +337,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={handleLunchStart}
-            className="group relative rounded-xl bg-gradient-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-amber-500/30 hover:border-amber-400/50"
+            onClick={() => openActionModal("startLunch")}
+            className="group relative rounded-xl bg-linear-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-amber-500/30 hover:border-amber-400/50"
           >
             <span className="relative z-10">⏸ Start Lunch</span>
             {lunchStart && (
@@ -339,8 +349,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={handleLunchEnd}
-            className="group relative rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-blue-500/30 hover:border-blue-400/50"
+            onClick={() => openActionModal("endLunch")}
+            className="group relative rounded-xl bg-linear-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-blue-500/30 hover:border-blue-400/50"
           >
             <span className="relative z-10">▶ End Lunch</span>
             {lunchEnd && (
@@ -351,8 +361,8 @@ export default function EmployeePage() {
           </button>
 
           <button
-            onClick={handleCheckOut}
-            className="group relative rounded-xl bg-gradient-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-red-500/30 hover:border-red-400/50"
+            onClick={() => openActionModal("checkout")}
+            className="group relative rounded-xl bg-linear-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-red-500/30 hover:border-red-400/50"
           >
             <span className="relative z-10">✕ Check Out</span>
             {checkOut && (
@@ -365,7 +375,7 @@ export default function EmployeePage() {
       </section>
 
       {/* Attendance Summary */}
-      <section className="mt-8 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
         <h2 className="text-2xl font-bold text-white uppercase tracking-wide">
           Today&apos;s Attendance
         </h2>
@@ -407,7 +417,7 @@ export default function EmployeePage() {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-8 rounded-xl border border-zinc-700 bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 p-6 backdrop-blur-sm">
+        <div className="mt-8 rounded-xl border border-zinc-700 bg-linear-to-br from-zinc-800/50 to-zinc-900/50 p-6 backdrop-blur-sm">
           <div className="grid gap-6 md:grid-cols-3">
             <div className="border-r border-zinc-700 pr-6 md:border-r">
               <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
@@ -436,6 +446,52 @@ export default function EmployeePage() {
           </div>
         </div>
       </section>
+
+      {/* Reusable Confirmation Modal for all attendance actions */}
+      {pendingAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">
+              {pendingAction === "checkin" && "Confirm Check In"}
+              {pendingAction === "startLunch" && "Confirm Start Lunch"}
+              {pendingAction === "endLunch" && "Confirm End Lunch"}
+              {pendingAction === "checkout" && "Confirm Check Out"}
+            </h3>
+            <p className="text-zinc-300 mb-4">Enter employee PIN to confirm.</p>
+
+            <input
+              type="password"
+              placeholder="Employee PIN"
+              value={modalPinInput}
+              onChange={(e) => setModalPinInput(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/50"
+            />
+
+            {modalError && (
+              <p className="mt-3 text-sm text-red-400">{modalError}</p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setPendingAction(null);
+                  setModalPinInput("");
+                  setModalError(null);
+                }}
+                className="rounded-lg bg-zinc-800 px-4 py-2 font-semibold text-zinc-300 hover:text-white hover:bg-zinc-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performPendingAction}
+                className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-500 transition"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
