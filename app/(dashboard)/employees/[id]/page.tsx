@@ -63,6 +63,15 @@ export default function EmployeePage() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [adminActionError, setAdminActionError] = useState<string | null>(null);
 
+  // Manual entry state
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualStep, setManualStep] = useState<"input" | "confirm">("input");
+  const [manualField, setManualField] = useState<
+    "check_in" | "check_out" | "lunch_start" | "lunch_end" | ""
+  >("");
+  const [manualTime, setManualTime] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadEmployee() {
       setIsLoadingEmployee(true);
@@ -298,6 +307,83 @@ export default function EmployeePage() {
       setAdminActionError(null);
     } else {
       setAdminModalError("Incorrect admin password.");
+    }
+  }
+
+  async function handleManualSubmit() {
+    if (manualStep === "input") {
+      if (!manualField || !manualTime) {
+        setManualError("Please select a field and enter a time.");
+        return;
+      }
+      setManualError(null);
+      setManualStep("confirm");
+      return;
+    }
+
+    try {
+      const rid = await ensureRecordExists();
+      if (!rid) {
+        setManualError("Could not find or create record.");
+        return;
+      }
+
+      // Parse the input time properly into the local timezone
+      const [hh, mm] = manualTime.split(":");
+      const dateObj = new Date();
+      dateObj.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+      const iso = dateObj.toISOString();
+      const displayTime = formatTime(dateObj);
+
+      const effCheckIn = manualField === "check_in" ? displayTime : checkIn;
+      const effCheckOut = manualField === "check_out" ? displayTime : checkOut;
+      const effLunchStart =
+        manualField === "lunch_start" ? displayTime : lunchStart;
+      const effLunchEnd = manualField === "lunch_end" ? displayTime : lunchEnd;
+
+      let extra = 0;
+      let total = 0;
+
+      if (effCheckOut) {
+        const lunchMins =
+          !effLunchStart || !effLunchEnd
+            ? 0
+            : getMinutesBetween(effLunchStart, effLunchEnd);
+        extra = Math.max(0, lunchMins - 30);
+        if (effCheckIn) {
+          total = Math.max(
+            0,
+            getMinutesBetween(effCheckIn, effCheckOut) - extra,
+          );
+        }
+      }
+
+      const updateData: any = {
+        [manualField]: iso,
+        extra_lunch_minutes: extra,
+        total_work_minutes: total,
+      };
+
+      const { error } = await supabase
+        .from("attendance_records")
+        .update(updateData)
+        .eq("id", rid);
+
+      if (error) {
+        console.error(error);
+        setManualError("Failed to update record.");
+        return;
+      }
+
+      if (manualField === "check_in") setCheckIn(displayTime);
+      if (manualField === "check_out") setCheckOut(displayTime);
+      if (manualField === "lunch_start") setLunchStart(displayTime);
+      if (manualField === "lunch_end") setLunchEnd(displayTime);
+
+      setShowManualModal(false);
+    } catch (err) {
+      console.error(err);
+      setManualError("An unexpected error occurred.");
     }
   }
 
@@ -567,6 +653,20 @@ export default function EmployeePage() {
             >
               Clear Lunch End
             </button>
+
+            <button
+              onClick={() => {
+                setAdminActionError(null);
+                setShowManualModal(true);
+                setManualStep("input");
+                setManualField("");
+                setManualTime("");
+                setManualError(null);
+              }}
+              className="rounded-xl bg-purple-700 px-4 py-2 font-bold text-white hover:bg-purple-600 transition"
+            >
+              Enter Manually
+            </button>
           </div>
         </section>
       )}
@@ -729,6 +829,76 @@ export default function EmployeePage() {
                 className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-500 transition"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Entry Modal */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">
+              Manual Time Entry
+            </h3>
+
+            {manualStep === "input" ? (
+              <>
+                <p className="text-zinc-300 mb-4">
+                  Select field and enter time.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <select
+                    value={manualField}
+                    onChange={(e) => setManualField(e.target.value as any)}
+                    className="w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-white outline-none transition-all duration-200 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/50"
+                  >
+                    <option value="">-- Select Field --</option>
+                    <option value="check_in">Check In</option>
+                    <option value="check_out">Check Out</option>
+                    <option value="lunch_start">Lunch Start</option>
+                    <option value="lunch_end">Lunch End</option>
+                  </select>
+
+                  <input
+                    type="time"
+                    value={manualTime}
+                    onChange={(e) => setManualTime(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-white outline-none transition-all duration-200 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/50"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-zinc-300 mb-4">
+                Are you sure you want to update{" "}
+                <span className="font-bold text-white">
+                  {manualField === "check_in" && "Check In"}
+                  {manualField === "check_out" && "Check Out"}
+                  {manualField === "lunch_start" && "Lunch Start"}
+                  {manualField === "lunch_end" && "Lunch End"}
+                </span>{" "}
+                to <span className="font-bold text-white">{manualTime}</span>?
+              </p>
+            )}
+
+            {manualError && (
+              <p className="mt-3 text-sm text-red-400">{manualError}</p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="rounded-lg bg-zinc-800 px-4 py-2 font-semibold text-zinc-300 hover:text-white hover:bg-zinc-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleManualSubmit}
+                className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-500 transition"
+              >
+                {manualStep === "input" ? "Next" : "Confirm"}
               </button>
             </div>
           </div>
