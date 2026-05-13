@@ -72,6 +72,11 @@ export default function EmployeePage() {
   const [manualTime, setManualTime] = useState("");
   const [manualError, setManualError] = useState<string | null>(null);
 
+  const isCheckInDisabled = !!checkIn;
+  const isStartLunchDisabled = !checkIn || !!lunchStart;
+  const isEndLunchDisabled = !lunchStart || !!lunchEnd;
+  const isCheckOutDisabled = !checkIn || !!checkOut;
+
   useEffect(() => {
     async function loadEmployee() {
       setIsLoadingEmployee(true);
@@ -187,18 +192,14 @@ export default function EmployeePage() {
   function openActionModal(
     action: "checkin" | "startLunch" | "endLunch" | "checkout",
   ) {
+    if (action === "checkin" && isCheckInDisabled) return;
+    if (action === "startLunch" && isStartLunchDisabled) return;
+    if (action === "endLunch" && isEndLunchDisabled) return;
+    if (action === "checkout" && isCheckOutDisabled) return;
+
     // reset modal state
     setModalPinInput("");
     setModalError(null);
-
-    // pre-validate action-specific rules and show message inside modal if needed
-    if (action === "endLunch" && !lunchStart) {
-      setModalError("Please start lunch first.");
-    }
-
-    if (action === "checkout" && !checkIn) {
-      setModalError("Please check in first.");
-    }
 
     setPendingAction(action);
   }
@@ -207,14 +208,10 @@ export default function EmployeePage() {
     if (!pendingAction) return;
 
     // re-check preconditions
-    if (pendingAction === "endLunch" && !lunchStart) {
-      setModalError("Please start lunch first.");
-      return;
-    }
-    if (pendingAction === "checkout" && !checkIn) {
-      setModalError("Please check in first.");
-      return;
-    }
+    if (pendingAction === "checkin" && isCheckInDisabled) return;
+    if (pendingAction === "startLunch" && isStartLunchDisabled) return;
+    if (pendingAction === "endLunch" && isEndLunchDisabled) return;
+    if (pendingAction === "checkout" && isCheckOutDisabled) return;
 
     // PIN validation
     if (!modalPinInput) {
@@ -437,7 +434,12 @@ export default function EmployeePage() {
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <button
             onClick={() => openActionModal("checkin")}
-            className="group relative rounded-xl bg-linear-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-green-500/30 hover:border-green-400/50"
+            disabled={isCheckInDisabled}
+            className={`group relative rounded-xl bg-linear-to-br from-green-600 to-green-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 border border-green-500/30 ${
+              isCheckInDisabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:from-green-500 hover:to-green-600 hover:shadow-green-500/50 hover:shadow-2xl active:scale-95 cursor-pointer hover:border-green-400/50"
+            }`}
           >
             <span className="relative z-10">✓ Check In</span>
             {checkIn && (
@@ -449,7 +451,12 @@ export default function EmployeePage() {
 
           <button
             onClick={() => openActionModal("startLunch")}
-            className="group relative rounded-xl bg-linear-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-amber-500/30 hover:border-amber-400/50"
+            disabled={isStartLunchDisabled}
+            className={`group relative rounded-xl bg-linear-to-br from-amber-600 to-amber-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 border border-amber-500/30 ${
+              isStartLunchDisabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:from-amber-500 hover:to-amber-600 hover:shadow-amber-500/50 hover:shadow-2xl active:scale-95 cursor-pointer hover:border-amber-400/50"
+            }`}
           >
             <span className="relative z-10">⏸ Start Lunch</span>
             {lunchStart && (
@@ -461,7 +468,12 @@ export default function EmployeePage() {
 
           <button
             onClick={() => openActionModal("endLunch")}
-            className="group relative rounded-xl bg-linear-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-blue-500/30 hover:border-blue-400/50"
+            disabled={isEndLunchDisabled}
+            className={`group relative rounded-xl bg-linear-to-br from-blue-600 to-blue-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 border border-blue-500/30 ${
+              isEndLunchDisabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:from-blue-500 hover:to-blue-600 hover:shadow-blue-500/50 hover:shadow-2xl active:scale-95 cursor-pointer hover:border-blue-400/50"
+            }`}
           >
             <span className="relative z-10">▶ End Lunch</span>
             {lunchEnd && (
@@ -473,7 +485,12 @@ export default function EmployeePage() {
 
           <button
             onClick={() => openActionModal("checkout")}
-            className="group relative rounded-xl bg-linear-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer border border-red-500/30 hover:border-red-400/50"
+            disabled={isCheckOutDisabled}
+            className={`group relative rounded-xl bg-linear-to-br from-red-600 to-red-700 px-6 py-4 font-bold text-white shadow-lg transition-all duration-300 border border-red-500/30 ${
+              isCheckOutDisabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:from-red-500 hover:to-red-600 hover:shadow-red-500/50 hover:shadow-2xl active:scale-95 cursor-pointer hover:border-red-400/50"
+            }`}
           >
             <span className="relative z-10">✕ Check Out</span>
             {checkOut && (
