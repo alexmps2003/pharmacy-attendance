@@ -230,8 +230,8 @@ export default function ReportsPage() {
                     <tr>
                       <th className="px-6 py-4 font-medium">Employee</th>
                       <th className="px-6 py-4 font-medium">Check In</th>
-                      <th className="px-6 py-4 font-medium">Lunch Out</th>
-                      <th className="px-6 py-4 font-medium">Lunch In</th>
+                      <th className="px-6 py-4 font-medium">Lunch Start</th>
+                      <th className="px-6 py-4 font-medium">Lunch End</th>
                       <th className="px-6 py-4 font-medium">Check Out</th>
                       <th className="px-6 py-4 font-medium">
                         Extra Lunch (Deduct)

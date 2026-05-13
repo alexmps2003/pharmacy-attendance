@@ -506,7 +506,7 @@ export default function EmployeePage() {
                   return;
                 }
                 if (lunchEnd) {
-                  setAdminActionError("Clear lunch in first.");
+                  setAdminActionError("Clear lunch end first.");
                   return;
                 }
 
@@ -518,19 +518,19 @@ export default function EmployeePage() {
 
                   if (error) {
                     console.error(error);
-                    setAdminActionError("Failed to clear lunch out.");
+                    setAdminActionError("Failed to clear lunch start.");
                     return;
                   }
 
                   setLunchStart(null);
                 } catch (err) {
                   console.error(err);
-                  setAdminActionError("Failed to clear lunch out.");
+                  setAdminActionError("Failed to clear lunch start.");
                 }
               }}
               className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
             >
-              Clear Lunch Out
+              Clear Lunch Start
             </button>
 
             <button
@@ -553,19 +553,19 @@ export default function EmployeePage() {
 
                   if (error) {
                     console.error(error);
-                    setAdminActionError("Failed to clear lunch in.");
+                    setAdminActionError("Failed to clear lunch end.");
                     return;
                   }
 
                   setLunchEnd(null);
                 } catch (err) {
                   console.error(err);
-                  setAdminActionError("Failed to clear lunch in.");
+                  setAdminActionError("Failed to clear lunch end.");
                 }
               }}
               className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
             >
-              Clear Lunch In
+              Clear Lunch End
             </button>
           </div>
         </section>
