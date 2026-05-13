@@ -472,8 +472,8 @@ export default function EmployeePage() {
                     .from("attendance_records")
                     .update({
                       check_out: null,
-                      total_work_minutes: null,
-                      extra_lunch_minutes: null,
+                      total_work_minutes: 0,
+                      extra_lunch_minutes: 0,
                     })
                     .eq("id", recordId);
 
