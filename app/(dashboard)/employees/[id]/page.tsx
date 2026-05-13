@@ -56,6 +56,13 @@ export default function EmployeePage() {
   const [modalPinInput, setModalPinInput] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
 
+  // Admin correction state
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminModalError, setAdminModalError] = useState<string | null>(null);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadEmployee() {
       setIsLoadingEmployee(true);
@@ -276,6 +283,24 @@ export default function EmployeePage() {
     }
   }
 
+  // Admin login handler (hardcoded password for now)
+  async function performAdminLogin() {
+    if (!adminPassword) {
+      setAdminModalError("Please enter admin password.");
+      return;
+    }
+
+    if (adminPassword === "200329") {
+      setIsAdminMode(true);
+      setShowAdminModal(false);
+      setAdminPassword("");
+      setAdminModalError(null);
+      setAdminActionError(null);
+    } else {
+      setAdminModalError("Incorrect admin password.");
+    }
+  }
+
   if (isLoadingEmployee) {
     return (
       <main className=" p-8 text-white">
@@ -372,7 +397,179 @@ export default function EmployeePage() {
             )}
           </button>
         </div>
+        {/* Admin Correction entry/button */}
+        <div className="mt-6">
+          <button
+            onClick={() => {
+              setShowAdminModal(true);
+              setAdminModalError(null);
+            }}
+            className="rounded-lg bg-zinc-800 px-4 py-2 font-semibold text-zinc-200 hover:text-white hover:bg-zinc-700 transition"
+          >
+            Admin Correction
+          </button>
+        </div>
       </section>
+
+      {/* Admin Corrections Panel (visible when admin mode is active) */}
+      {isAdminMode && (
+        <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-6 shadow-xl">
+          <h3 className="text-xl font-bold text-white">Admin Corrections</h3>
+          <p className="mt-2 text-sm text-zinc-400">
+            Use these to clear specific timestamps.
+          </p>
+
+          {adminActionError && (
+            <p className="mt-3 text-sm text-red-400">{adminActionError}</p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              onClick={async () => {
+                setAdminActionError(null);
+                if (!recordId) {
+                  setAdminActionError("No attendance record for today.");
+                  return;
+                }
+                if (checkOut) {
+                  setAdminActionError("Clear check out first.");
+                  return;
+                }
+
+                try {
+                  const { error } = await supabase
+                    .from("attendance_records")
+                    .update({ check_in: null })
+                    .eq("id", recordId);
+
+                  if (error) {
+                    console.error(error);
+                    setAdminActionError("Failed to clear check in.");
+                    return;
+                  }
+
+                  setCheckIn(null);
+                } catch (err) {
+                  console.error(err);
+                  setAdminActionError("Failed to clear check in.");
+                }
+              }}
+              className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
+            >
+              Clear Check In
+            </button>
+
+            <button
+              onClick={async () => {
+                setAdminActionError(null);
+                if (!recordId) {
+                  setAdminActionError("No attendance record for today.");
+                  return;
+                }
+
+                try {
+                  const { error } = await supabase
+                    .from("attendance_records")
+                    .update({
+                      check_out: null,
+                      total_work_minutes: null,
+                      extra_lunch_minutes: null,
+                    })
+                    .eq("id", recordId);
+
+                  if (error) {
+                    console.error(error);
+                    setAdminActionError("Failed to clear check out.");
+                    return;
+                  }
+
+                  setCheckOut(null);
+                } catch (err) {
+                  console.error(err);
+                  setAdminActionError("Failed to clear check out.");
+                }
+              }}
+              className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
+            >
+              Clear Check Out
+            </button>
+
+            <button
+              onClick={async () => {
+                setAdminActionError(null);
+                if (!recordId) {
+                  setAdminActionError("No attendance record for today.");
+                  return;
+                }
+                if (checkOut) {
+                  setAdminActionError("Clear check out first.");
+                  return;
+                }
+                if (lunchEnd) {
+                  setAdminActionError("Clear lunch in first.");
+                  return;
+                }
+
+                try {
+                  const { error } = await supabase
+                    .from("attendance_records")
+                    .update({ lunch_start: null })
+                    .eq("id", recordId);
+
+                  if (error) {
+                    console.error(error);
+                    setAdminActionError("Failed to clear lunch out.");
+                    return;
+                  }
+
+                  setLunchStart(null);
+                } catch (err) {
+                  console.error(err);
+                  setAdminActionError("Failed to clear lunch out.");
+                }
+              }}
+              className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
+            >
+              Clear Lunch Out
+            </button>
+
+            <button
+              onClick={async () => {
+                setAdminActionError(null);
+                if (!recordId) {
+                  setAdminActionError("No attendance record for today.");
+                  return;
+                }
+                if (checkOut) {
+                  setAdminActionError("Clear check out first.");
+                  return;
+                }
+
+                try {
+                  const { error } = await supabase
+                    .from("attendance_records")
+                    .update({ lunch_end: null })
+                    .eq("id", recordId);
+
+                  if (error) {
+                    console.error(error);
+                    setAdminActionError("Failed to clear lunch in.");
+                    return;
+                  }
+
+                  setLunchEnd(null);
+                } catch (err) {
+                  console.error(err);
+                  setAdminActionError("Failed to clear lunch in.");
+                }
+              }}
+              className="rounded-xl bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-600 transition"
+            >
+              Clear Lunch In
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Attendance Summary */}
       <section className="mt-8 rounded-2xl border border-zinc-800 bg-linear-to-br from-zinc-900 to-zinc-950 p-8 shadow-xl">
@@ -484,6 +681,51 @@ export default function EmployeePage() {
               </button>
               <button
                 onClick={performPendingAction}
+                className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-500 transition"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Password Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">
+              Admin Correction
+            </h3>
+            <p className="text-zinc-300 mb-4">
+              Enter admin password to unlock corrections.
+            </p>
+
+            <input
+              type="password"
+              placeholder="Admin password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-600/50"
+            />
+
+            {adminModalError && (
+              <p className="mt-3 text-sm text-red-400">{adminModalError}</p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAdminModal(false);
+                  setAdminPassword("");
+                  setAdminModalError(null);
+                }}
+                className="rounded-lg bg-zinc-800 px-4 py-2 font-semibold text-zinc-300 hover:text-white hover:bg-zinc-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performAdminLogin}
                 className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-500 transition"
               >
                 Confirm
