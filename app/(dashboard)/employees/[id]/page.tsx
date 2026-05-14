@@ -50,6 +50,8 @@ export default function EmployeePage() {
   const [checkOut, setCheckOut] = useState<string | null>(null);
   const [pauseMinutes, setPauseMinutes] = useState<number>(0);
   const [recordId, setRecordId] = useState<number | null>(null);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [pauseStart, setPauseStart] = useState<string | null>(null);
 
   const [pendingAction, setPendingAction] = useState<
     "checkin" | "startLunch" | "endLunch" | "checkout" | null
@@ -76,7 +78,7 @@ export default function EmployeePage() {
   const isCheckInDisabled = !!checkIn;
   const isStartLunchDisabled = !checkIn || !!lunchStart;
   const isEndLunchDisabled = !lunchStart || !!lunchEnd;
-  const isCheckOutDisabled = !checkIn || !!checkOut;
+  const isCheckOutDisabled = !checkIn || !!checkOut || isPaused;
 
   useEffect(() => {
     async function loadEmployee() {
@@ -112,7 +114,7 @@ export default function EmployeePage() {
         const { data, error } = await supabase
           .from("attendance_records")
           .select(
-            "id, check_in, lunch_start, lunch_end, check_out, pause_minutes",
+            "id, check_in, lunch_start, lunch_end, check_out, pause_minutes, is_paused, pause_start",
           )
           .eq("employee_id", employeeId)
           .eq("work_date", today)
@@ -127,6 +129,8 @@ export default function EmployeePage() {
           const rec: any = data[0];
           setRecordId(rec.id ?? null);
           setPauseMinutes(rec.pause_minutes || 0);
+          setIsPaused(rec.is_paused || false);
+          if (rec.pause_start) setPauseStart(rec.pause_start);
 
           if (rec.check_in) setCheckIn(formatTime(new Date(rec.check_in)));
           if (rec.lunch_start)
@@ -308,6 +312,58 @@ export default function EmployeePage() {
       setAdminActionError(null);
     } else {
       setAdminModalError("Incorrect admin password.");
+    }
+  }
+
+  async function handleTogglePause() {
+    setAdminActionError(null);
+    if (!recordId) {
+      setAdminActionError("No attendance record for today.");
+      return;
+    }
+
+    try {
+      const now = new Date();
+      if (!isPaused) {
+        // Pause
+        const iso = now.toISOString();
+        const { error } = await supabase
+          .from("attendance_records")
+          .update({ is_paused: true, pause_start: iso })
+          .eq("id", recordId);
+
+        if (error) throw error;
+        setIsPaused(true);
+        setPauseStart(iso);
+      } else {
+        // Resume
+        let addedMinutes = 0;
+        if (pauseStart) {
+          const pStart = new Date(pauseStart);
+          addedMinutes = Math.max(
+            0,
+            Math.round((now.getTime() - pStart.getTime()) / 60000),
+          );
+        }
+        const newTotalPause = pauseMinutes + addedMinutes;
+
+        const { error } = await supabase
+          .from("attendance_records")
+          .update({
+            is_paused: false,
+            pause_start: null,
+            pause_minutes: newTotalPause,
+          })
+          .eq("id", recordId);
+
+        if (error) throw error;
+        setIsPaused(false);
+        setPauseStart(null);
+        setPauseMinutes(newTotalPause);
+      }
+    } catch (err) {
+      console.error(err);
+      setAdminActionError("Failed to toggle pause.");
     }
   }
 
@@ -502,6 +558,11 @@ export default function EmployeePage() {
                 {checkOut}
               </span>
             )}
+            {isPaused && !checkOut && (
+              <span className="absolute bottom-2 right-3 text-[10px] text-red-300">
+                Must resume first
+              </span>
+            )}
           </button>
         </div>
         {/* Admin Correction entry/button */}
@@ -687,6 +748,13 @@ export default function EmployeePage() {
               className="rounded-xl bg-purple-700 px-4 py-2 font-bold text-white hover:bg-purple-600 transition"
             >
               Enter Manually
+            </button>
+
+            <button
+              onClick={handleTogglePause}
+              className="rounded-xl bg-teal-700 px-4 py-2 font-bold text-white hover:bg-teal-600 transition"
+            >
+              {isPaused ? "Resume" : "Pause"}
             </button>
           </div>
         </section>
