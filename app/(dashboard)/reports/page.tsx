@@ -40,6 +40,7 @@ interface AttendanceRecord {
   lunch_end: string | null;
   check_out: string | null;
   extra_lunch_minutes: number | null;
+  pause_minutes: number | null;
   total_work_minutes: number | null;
   employees: {
     name: string;
@@ -85,6 +86,7 @@ export default function ReportsPage() {
             lunch_end,
             check_out,
             extra_lunch_minutes,
+            pause_minutes,
             total_work_minutes,
             employees (
               name,
@@ -236,6 +238,7 @@ export default function ReportsPage() {
                       <th className="px-6 py-4 font-medium">
                         Extra Lunch (Deduct)
                       </th>
+                      <th className="px-6 py-4 font-medium">Paused Time</th>
                       <th className="px-6 py-4 font-medium">Total Work Time</th>
                     </tr>
                   </thead>
@@ -266,6 +269,9 @@ export default function ReportsPage() {
                           <td className="px-6 py-4 text-red-400">
                             {formatMinutes(record.extra_lunch_minutes)}
                           </td>
+                          <td className="px-6 py-4 text-amber-500">
+                            {formatMinutes(record.pause_minutes || 0)}
+                          </td>
                           <td className="px-6 py-4 font-medium text-emerald-400">
                             {formatMinutes(record.total_work_minutes)}
                           </td>
@@ -274,7 +280,7 @@ export default function ReportsPage() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-6 py-12 text-center text-zinc-500"
                         >
                           <p className="text-lg mb-1">

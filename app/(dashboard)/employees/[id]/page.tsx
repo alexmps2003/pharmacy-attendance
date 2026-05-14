@@ -48,6 +48,7 @@ export default function EmployeePage() {
   const [lunchStart, setLunchStart] = useState<string | null>(null);
   const [lunchEnd, setLunchEnd] = useState<string | null>(null);
   const [checkOut, setCheckOut] = useState<string | null>(null);
+  const [pauseMinutes, setPauseMinutes] = useState<number>(0);
   const [recordId, setRecordId] = useState<number | null>(null);
 
   const [pendingAction, setPendingAction] = useState<
@@ -110,7 +111,9 @@ export default function EmployeePage() {
 
         const { data, error } = await supabase
           .from("attendance_records")
-          .select("id, check_in, lunch_start, lunch_end, check_out")
+          .select(
+            "id, check_in, lunch_start, lunch_end, check_out, pause_minutes",
+          )
           .eq("employee_id", employeeId)
           .eq("work_date", today)
           .limit(1);
@@ -123,6 +126,7 @@ export default function EmployeePage() {
         if (data && data.length > 0) {
           const rec: any = data[0];
           setRecordId(rec.id ?? null);
+          setPauseMinutes(rec.pause_minutes || 0);
 
           if (rec.check_in) setCheckIn(formatTime(new Date(rec.check_in)));
           if (rec.lunch_start)
@@ -732,7 +736,7 @@ export default function EmployeePage() {
 
         {/* Summary Stats */}
         <div className="mt-8 rounded-xl border border-zinc-700 bg-linear-to-br from-zinc-800/50 to-zinc-900/50 p-6 backdrop-blur-sm">
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-4">
             <div className="border-r border-zinc-700 pr-6 md:border-r">
               <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                 Lunch Duration
@@ -747,6 +751,14 @@ export default function EmployeePage() {
               </p>
               <p className="mt-2 text-2xl font-bold text-red-400">
                 {formatMinutes(extraLunchMinutes)}
+              </p>
+            </div>
+            <div className="border-r border-zinc-700 pr-6 md:border-r">
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                Paused Time
+              </p>
+              <p className="mt-2 text-2xl font-bold text-amber-500">
+                {formatMinutes(pauseMinutes)}
               </p>
             </div>
             <div>
