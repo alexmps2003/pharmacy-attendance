@@ -151,7 +151,7 @@ export default function EmployeePage() {
   const extraLunchMinutes = Math.max(0, lunchMinutes - 30);
   const totalMinutes = Math.max(
     0,
-    getMinutesBetween(checkIn, checkOut) - extraLunchMinutes,
+    getMinutesBetween(checkIn, checkOut) - extraLunchMinutes - pauseMinutes,
   );
 
   function saveCurrentTime(setter: (time: string) => void) {
@@ -272,7 +272,7 @@ export default function EmployeePage() {
         const extra = Math.max(0, lunchMins - 30);
         const total = Math.max(
           0,
-          getMinutesBetween(checkIn, formatTime(now)) - extra,
+          getMinutesBetween(checkIn, formatTime(now)) - extra - pauseMinutes,
         );
 
         await supabase
@@ -410,7 +410,7 @@ export default function EmployeePage() {
         if (effCheckIn) {
           total = Math.max(
             0,
-            getMinutesBetween(effCheckIn, effCheckOut) - extra,
+            getMinutesBetween(effCheckIn, effCheckOut) - extra - pauseMinutes,
           );
         }
       }
